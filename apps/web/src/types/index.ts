@@ -211,6 +211,12 @@ export interface Sesion {
   updated_at: string
 }
 
+export interface TareasCasa {
+  titulo: string
+  descripcion: string
+  frecuencia: string
+}
+
 export interface ReporteIA {
   id: string
   paciente_id: string
@@ -223,6 +229,8 @@ export interface ReporteIA {
   tokens_usados?: number
   modelo?: string
   enviado_a_padres: boolean
+  tareas_casa?: TareasCasa[]
+  recomendaciones?: string[]
   created_at: string
   updated_at: string
 }
