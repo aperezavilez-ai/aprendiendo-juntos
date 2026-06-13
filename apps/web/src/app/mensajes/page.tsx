@@ -10,7 +10,7 @@ import {
   PlusIcon,
   XMarkIcon,
   DocumentTextIcon,
-  CheckCheckIcon,
+  CheckCircleIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import { format, isToday, isYesterday } from 'date-fns'
@@ -313,7 +313,7 @@ export default function MensajesPage() {
                               <p className="text-xs text-neutral-400">
                                 {format(new Date(msg.created_at), 'HH:mm')}
                               </p>
-                              <CheckCheckIcon className={`w-3.5 h-3.5 ${estadoWAColor[msg.estado]}`} />
+                              <CheckCircleIcon className={`w-3.5 h-3.5 ${estadoWAColor[msg.estado]}`} />
                               <span className="text-2xs text-neutral-400 capitalize">{msg.estado}</span>
                             </div>
                           </div>
