@@ -217,6 +217,7 @@ export interface ReporteIA {
   clinica_id: string
   generado_por: string
   tipo: TipoReporteIA
+  titulo?: string
   prompt: string
   contenido: string
   tokens_usados?: number
