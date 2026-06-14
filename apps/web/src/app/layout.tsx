@@ -11,8 +11,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | TerapiaOS',
-    default: 'TerapiaOS — Plataforma de Terapia Ocupacional Infantil',
+    template: '%s | Aprendamos Juntos',
+    default: 'Aprendamos Juntos — Plataforma de Terapia Ocupacional Infantil',
   },
   description:
     'Sistema integral para consultorios y clínicas de terapia ocupacional infantil. Gestiona pacientes, citas, evaluaciones y reportes con inteligencia artificial.',
@@ -20,15 +20,15 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'TerapiaOS',
+    title: 'Aprendamos Juntos',
   },
   formatDetection: {
     telephone: false,
   },
   openGraph: {
     type: 'website',
-    siteName: 'TerapiaOS',
-    title: 'TerapiaOS — Terapia Ocupacional Infantil',
+    siteName: 'Aprendamos Juntos',
+    title: 'Aprendamos Juntos — Terapia Ocupacional Infantil',
     description: 'Plataforma SaaS para clínicas de terapia ocupacional infantil',
   },
   icons: {

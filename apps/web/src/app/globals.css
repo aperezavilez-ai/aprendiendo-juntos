@@ -163,7 +163,7 @@
 
   /* ===== SIDEBAR ===== */
   .sidebar-item {
-    @apply flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-150 cursor-pointer;
+    @apply flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-all duration-150 cursor-pointer;
   }
   .sidebar-item-active {
     @apply sidebar-item bg-primary-50 text-primary-700 hover:bg-primary-100 hover:text-primary-800;

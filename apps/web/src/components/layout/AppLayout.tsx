@@ -115,7 +115,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <span className="text-white font-bold text-sm">T</span>
           </div>
           <div>
-            <p className="font-semibold text-neutral-900 text-sm leading-none">TerapiaOS</p>
+            <p className="font-semibold text-neutral-900 text-sm leading-none">Aprendamos Juntos</p>
             <p className="text-2xs text-neutral-400 mt-0.5 leading-none truncate max-w-[130px]">
               {clinicaNombre}
             </p>
