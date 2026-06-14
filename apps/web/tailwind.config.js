@@ -50,6 +50,7 @@ module.exports = {
           400: '#FBBF24',
           500: '#F59E0B',
           600: '#D97706',
+          700: '#B45309',
         },
         // Peligro
         danger: {
@@ -58,6 +59,7 @@ module.exports = {
           400: '#FB7185',
           500: '#EF4444',
           600: '#DC2626',
+          700: '#B91C1C',
         },
         // Neutrales clínicos
         neutral: {
