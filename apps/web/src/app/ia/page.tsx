@@ -255,7 +255,7 @@ ${instrucciones ? `INSTRUCCIONES ADICIONALES: ${instrucciones}` : ''}
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
-                  <modo.icon className="w-4.5 h-4.5 shrink-0" />
+                  <modo.icon className="w-5 h-5 shrink-0" />
                   <div>
                     <p className="font-medium leading-none mb-0.5">{modo.label}</p>
                     <p className={`text-xs ${modoSeleccionado === modo.id ? 'text-primary-200' : 'text-neutral-400'}`}>
