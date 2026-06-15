@@ -28,28 +28,40 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { format, startOfWeek, addDays, isToday } from 'date-fns'
+import { format, startOfWeek, addDays, endOfWeek, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 const COLORS = ['#6366F1', '#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444']
 
-// Datos de ejemplo para gráficas (en producción vienen de Supabase)
-const dataCitas = [
-  { dia: 'Lun', citas: 8, completadas: 7 },
-  { dia: 'Mar', citas: 10, completadas: 9 },
-  { dia: 'Mie', citas: 7, completadas: 6 },
-  { dia: 'Jue', citas: 12, completadas: 11 },
-  { dia: 'Vie', citas: 9, completadas: 8 },
-  { dia: 'Sab', citas: 4, completadas: 4 },
-]
+const AREAS_LABEL: Record<string, string> = {
+  motricidad_fina: 'Motricidad Fina',
+  motricidad_gruesa: 'M. Gruesa',
+  integracion_sensorial: 'Sensorial',
+  atencion: 'Atención',
+  conducta: 'Conducta',
+  cognitivo: 'Cognitivo',
+  lenguaje: 'Lenguaje',
+  socioafectivo: 'Socioafectivo',
+}
 
-const dataAreas = [
-  { name: 'Motricidad Fina', value: 32 },
-  { name: 'M. Gruesa', value: 24 },
-  { name: 'Sensorial', value: 18 },
-  { name: 'Atención', value: 15 },
-  { name: 'Conducta', value: 11 },
-]
+interface ChartCitas {
+  dia: string
+  citas: number
+  completadas: number
+}
+
+interface ChartArea {
+  name: string
+  value: number
+}
+
+interface InsightDashboard {
+  tipo: 'warning' | 'info' | 'success'
+  titulo: string
+  mensaje: string
+  link?: string
+  linkLabel?: string
+}
 
 interface KPI {
   label: string
@@ -81,6 +93,9 @@ export default function DashboardPage() {
   const [kpis, setKpis] = useState<KPI[]>([])
   const [citasHoy, setCitasHoy] = useState<CitaHoy[]>([])
   const [alertas, setAlertas] = useState<AlertaDashboard[]>([])
+  const [dataCitas, setDataCitas] = useState<ChartCitas[]>([])
+  const [dataAreas, setDataAreas] = useState<ChartArea[]>([])
+  const [insights, setInsights] = useState<InsightDashboard[]>([])
   const [loading, setLoading] = useState(true)
   const [fechaHoy] = useState(new Date())
   const supabase = createClient()
@@ -152,6 +167,21 @@ export default function DashboardPage() {
 
       const totalIngresos = ingresos?.reduce((sum, f) => sum + (f.total || 0), 0) || 0
 
+      const inicioMesAnterior = startOfMonth(subMonths(fechaHoy, 1)).toISOString()
+      const finMesAnterior = new Date(fechaHoy.getFullYear(), fechaHoy.getMonth(), 0, 23, 59, 59).toISOString()
+      const { data: ingresosAnterior } = await supabase
+        .from('facturacion')
+        .select('total')
+        .eq('clinica_id', clinicaId)
+        .eq('estado', 'pagado')
+        .gte('fecha_pago', inicioMesAnterior)
+        .lte('fecha_pago', finMesAnterior)
+
+      const totalIngresosAnterior = ingresosAnterior?.reduce((sum, f) => sum + (f.total || 0), 0) || 0
+      const deltaIngresos = totalIngresosAnterior > 0
+        ? Math.round(((totalIngresos - totalIngresosAnterior) / totalIngresosAnterior) * 100)
+        : totalIngresos > 0 ? 100 : 0
+
       setKpis([
         {
           label: 'Pacientes activos',
@@ -174,8 +204,8 @@ export default function DashboardPage() {
         {
           label: 'Ingresos del mes',
           value: `$${totalIngresos.toLocaleString('es-MX', { minimumFractionDigits: 0 })}`,
-          change: 12,
-          trend: 'up',
+          change: deltaIngresos,
+          trend: deltaIngresos >= 0 ? 'up' : 'down',
           icon: BanknotesIcon,
           color: 'success',
           link: '/facturacion',
@@ -216,6 +246,115 @@ export default function DashboardPage() {
         })
       }
       setAlertas(alertasArr)
+
+      const weekStart = startOfWeek(fechaHoy, { weekStartsOn: 1 })
+      const weekEnd = endOfWeek(fechaHoy, { weekStartsOn: 1 })
+      const { data: citasSemana } = await supabase
+        .from('citas')
+        .select('fecha_inicio, estado')
+        .eq('clinica_id', clinicaId)
+        .gte('fecha_inicio', weekStart.toISOString())
+        .lte('fecha_inicio', weekEnd.toISOString())
+
+      const semanaChart: ChartCitas[] = []
+      for (let i = 0; i < 6; i++) {
+        const day = addDays(weekStart, i)
+        const dayLabel = format(day, 'EEE', { locale: es })
+        const dayStr = format(day, 'yyyy-MM-dd')
+        const delDia = (citasSemana || []).filter(c =>
+          format(new Date(c.fecha_inicio), 'yyyy-MM-dd') === dayStr
+        )
+        semanaChart.push({
+          dia: dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1, 3),
+          citas: delDia.length,
+          completadas: delDia.filter(c => c.estado === 'completada').length,
+        })
+      }
+      setDataCitas(semanaChart)
+
+      const { data: evals } = await supabase
+        .from('evaluaciones')
+        .select('tipo')
+        .eq('clinica_id', clinicaId)
+
+      const areasCount: Record<string, number> = {}
+      for (const ev of evals || []) {
+        areasCount[ev.tipo] = (areasCount[ev.tipo] || 0) + 1
+      }
+      setDataAreas(
+        Object.entries(areasCount).map(([tipo, count]) => ({
+          name: AREAS_LABEL[tipo] || tipo,
+          value: count,
+        }))
+      )
+
+      const hace14 = new Date(fechaHoy)
+      hace14.setDate(hace14.getDate() - 14)
+      const { data: pacientesActivosList } = await supabase
+        .from('pacientes')
+        .select('id')
+        .eq('clinica_id', clinicaId)
+        .eq('activo', true)
+
+      let sinCitaReciente = 0
+      for (const p of pacientesActivosList || []) {
+        const { count } = await supabase
+          .from('citas')
+          .select('*', { count: 'exact', head: true })
+          .eq('paciente_id', p.id)
+          .eq('estado', 'completada')
+          .gte('fecha_inicio', hace14.toISOString())
+        if (!count) sinCitaReciente++
+      }
+
+      const hace90 = new Date(fechaHoy)
+      hace90.setDate(hace90.getDate() - 90)
+      let sinEvalReciente = 0
+      for (const p of pacientesActivosList || []) {
+        const { count } = await supabase
+          .from('evaluaciones')
+          .select('*', { count: 'exact', head: true })
+          .eq('paciente_id', p.id)
+          .gte('fecha', hace90.toISOString())
+        if (!count) sinEvalReciente++
+      }
+
+      const inicioSemana = startOfWeek(fechaHoy, { weekStartsOn: 1 }).toISOString()
+      const { count: sesionesSemana } = await supabase
+        .from('sesiones')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinica_id', clinicaId)
+        .gte('fecha', inicioSemana)
+
+      const insightsArr: InsightDashboard[] = []
+      if (sinCitaReciente > 0) {
+        insightsArr.push({
+          tipo: 'warning',
+          titulo: 'Pacientes sin sesión reciente',
+          mensaje: `${sinCitaReciente} paciente${sinCitaReciente > 1 ? 's' : ''} no ${sinCitaReciente > 1 ? 'tienen' : 'tiene'} cita completada en más de 2 semanas.`,
+          link: '/agenda',
+          linkLabel: 'Ver agenda',
+        })
+      }
+      if (sinEvalReciente > 0) {
+        insightsArr.push({
+          tipo: 'info',
+          titulo: 'Evaluaciones pendientes',
+          mensaje: `${sinEvalReciente} paciente${sinEvalReciente > 1 ? 's' : ''} llevan más de 90 días sin evaluación de progreso.`,
+          link: '/evaluaciones/pendientes',
+          linkLabel: 'Programar evaluaciones',
+        })
+      }
+      if ((sesionesSemana || 0) > 0) {
+        insightsArr.push({
+          tipo: 'success',
+          titulo: 'Actividad de la semana',
+          mensaje: `${sesionesSemana} sesión${(sesionesSemana || 0) > 1 ? 'es' : ''} registrada${(sesionesSemana || 0) > 1 ? 's' : ''} esta semana.`,
+          link: '/sesiones',
+          linkLabel: 'Ver sesiones',
+        })
+      }
+      setInsights(insightsArr)
 
     } catch (err) {
       console.error('Error fetching dashboard:', err)
@@ -319,16 +458,16 @@ export default function DashboardPage() {
               >
                 <kpi.icon className="w-5 h-5" />
               </div>
-              {kpi.trend === 'up' && kpi.change > 0 && (
+              {kpi.trend === 'up' && kpi.change !== 0 && (
                 <span className="stat-change-up flex items-center gap-0.5">
                   <ArrowTrendingUpIcon className="w-3.5 h-3.5" />
-                  +{kpi.change}
+                  {kpi.label === 'Ingresos del mes' ? `${kpi.change > 0 ? '+' : ''}${kpi.change}%` : `+${kpi.change}`}
                 </span>
               )}
-              {kpi.trend === 'down' && (
+              {kpi.trend === 'down' && kpi.change !== 0 && kpi.label === 'Ingresos del mes' && (
                 <span className="stat-change-down flex items-center gap-0.5">
                   <ArrowTrendingDownIcon className="w-3.5 h-3.5" />
-                  Atención
+                  {kpi.change}%
                 </span>
               )}
             </div>
@@ -350,7 +489,7 @@ export default function DashboardPage() {
             <Link href="/reportes" className="btn-ghost btn-sm">Ver reportes</Link>
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={dataCitas} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={dataCitas.length ? dataCitas : [{ dia: '-', citas: 0, completadas: 0 }]} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorCitas" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6366F1" stopOpacity={0.15} />
@@ -377,8 +516,12 @@ export default function DashboardPage() {
         <div className="card p-5">
           <div className="mb-4">
             <h2 className="text-sm font-semibold text-neutral-900">Áreas de intervención</h2>
-            <p className="text-xs text-neutral-500">Distribución de pacientes</p>
+            <p className="text-xs text-neutral-500">Evaluaciones por área</p>
           </div>
+          {dataAreas.length === 0 ? (
+            <div className="text-center py-8 text-xs text-neutral-400">Sin evaluaciones registradas</div>
+          ) : (
+            <>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
               <Pie
@@ -396,7 +539,7 @@ export default function DashboardPage() {
               </Pie>
               <Tooltip
                 contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
-                formatter={(value, name) => [`${value}%`, name]}
+                formatter={(value, name) => [`${value} eval.`, name]}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -404,13 +547,15 @@ export default function DashboardPage() {
             {dataAreas.map((item, i) => (
               <div key={item.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: COLORS[i] }} />
+                  <div className="w-2 h-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
                   <span className="text-neutral-600">{item.name}</span>
                 </div>
-                <span className="font-medium text-neutral-800">{item.value}%</span>
+                <span className="font-medium text-neutral-800">{item.value}</span>
               </div>
             ))}
           </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -469,30 +614,57 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="space-y-3">
-            <div className="bg-secondary-50 rounded-xl p-3.5 border border-secondary-100">
-              <p className="text-xs font-medium text-secondary-800 mb-1">📊 Paciente en riesgo</p>
-              <p className="text-xs text-secondary-700">
-                3 pacientes no han asistido en más de 2 semanas. Considera enviarles un recordatorio.
-              </p>
-              <Link href="/pacientes?filtro=inactivos" className="text-xs text-secondary-600 font-medium mt-2 inline-block hover:underline">
-                Ver pacientes →
-              </Link>
-            </div>
-            <div className="bg-primary-50 rounded-xl p-3.5 border border-primary-100">
-              <p className="text-xs font-medium text-primary-800 mb-1">🎯 Evaluaciones pendientes</p>
-              <p className="text-xs text-primary-700">
-                5 pacientes llevan más de 90 días sin evaluación de progreso.
-              </p>
-              <Link href="/evaluaciones/pendientes" className="text-xs text-primary-600 font-medium mt-2 inline-block hover:underline">
-                Programar evaluaciones →
-              </Link>
-            </div>
-            <div className="bg-success-50 rounded-xl p-3.5 border border-success-100">
-              <p className="text-xs font-medium text-success-800 mb-1">✨ Logro de la semana</p>
-              <p className="text-xs text-success-700">
-                8 objetivos terapéuticos fueron alcanzados esta semana. ¡Excelente trabajo!
-              </p>
-            </div>
+            {insights.length === 0 ? (
+              <div className="text-center py-6 text-xs text-neutral-400">
+                Sin alertas clínicas por ahora. ¡Buen trabajo!
+              </div>
+            ) : (
+              insights.map((insight, i) => (
+                <div
+                  key={i}
+                  className={`rounded-xl p-3.5 border ${
+                    insight.tipo === 'warning'
+                      ? 'bg-warning-50 border-warning-100'
+                      : insight.tipo === 'success'
+                      ? 'bg-success-50 border-success-100'
+                      : 'bg-primary-50 border-primary-100'
+                  }`}
+                >
+                  <p className={`text-xs font-medium mb-1 ${
+                    insight.tipo === 'warning'
+                      ? 'text-warning-800'
+                      : insight.tipo === 'success'
+                      ? 'text-success-800'
+                      : 'text-primary-800'
+                  }`}>
+                    {insight.titulo}
+                  </p>
+                  <p className={`text-xs ${
+                    insight.tipo === 'warning'
+                      ? 'text-warning-700'
+                      : insight.tipo === 'success'
+                      ? 'text-success-700'
+                      : 'text-primary-700'
+                  }`}>
+                    {insight.mensaje}
+                  </p>
+                  {insight.link && insight.linkLabel && (
+                    <Link
+                      href={insight.link}
+                      className={`text-xs font-medium mt-2 inline-block hover:underline ${
+                        insight.tipo === 'warning'
+                          ? 'text-warning-600'
+                          : insight.tipo === 'success'
+                          ? 'text-success-600'
+                          : 'text-primary-600'
+                      }`}
+                    >
+                      {insight.linkLabel} →
+                    </Link>
+                  )}
+                </div>
+              ))
+            )}
           </div>
           <Link href="/ia" className="btn-secondary btn-sm w-full mt-4 justify-center">
             <SparklesIcon className="w-4 h-4" />

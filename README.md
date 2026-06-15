@@ -64,7 +64,7 @@ terapia-saas/
 │   │   └── public/
 │   │       ├── manifest.json   # PWA Manifest
 │   │       └── sw.js           # Service Worker
-│   └── portal-padres/          # Portal para padres (app separada)
+│   └── portal-padres/          # ⚠️ OBSOLETO — ver DEPRECATED.md (usar apps/web/portal)
 ├── packages/
 │   ├── db/                     # Tipos de DB y cliente Supabase
 │   └── ui/                     # Componentes compartidos
@@ -101,18 +101,21 @@ cp .env.example apps/web/.env.local
 ### 4. Configurar Supabase
 
 1. Crea un nuevo proyecto en [supabase.com](https://supabase.com)
-2. Ve a **SQL Editor** y ejecuta el archivo de migración:
+2. Ve a **SQL Editor** y ejecuta las migraciones en orden:
 
 ```bash
-# Desde el dashboard de Supabase → SQL Editor
-# Pega el contenido de supabase/migrations/001_schema_completo.sql
+# supabase/migrations/001_schema_completo.sql
+# supabase/migrations/002_portal_padres.sql
+# supabase/migrations/003_storage_archivos.sql
 ```
 
 3. En **Authentication → Settings**:
    - Habilita "Email Auth"
    - Configura el dominio de redirección (e.g., `http://localhost:3000`)
 
-4. En **Storage**, crea un bucket llamado `terapia-os-files`
+4. En **Storage**, crea un bucket llamado `terapia-os-files` (o ejecuta `003_storage_archivos.sql`, que lo crea automáticamente)
+
+> **Portal padres:** usa `apps/web` en `/portal/*`. La carpeta `apps/portal-padres` está obsoleta (ver `DEPRECATED.md`).
 
 ### 5. Crear usuario administrador
 

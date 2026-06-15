@@ -18,6 +18,7 @@ import {
 } from 'recharts'
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns'
 import { es } from 'date-fns/locale'
+import toast from 'react-hot-toast'
 
 const COLORS = ['#6366F1', '#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444']
 
@@ -191,9 +192,10 @@ export default function ReportesPage() {
       a.href = url
       a.download = `reporte-${format(new Date(), 'yyyy-MM-dd')}.pdf`
       a.click()
-    } catch {
-      // PDF generation via browser
-      window.print()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      toast.error('No se pudo generar el PDF')
     } finally {
       setGenerandoPDF(false)
     }

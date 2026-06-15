@@ -402,9 +402,29 @@ ${instrucciones ? `INSTRUCCIONES ADICIONALES: ${instrucciones}` : ''}
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
-                    onClick={() => {
-                      // Descargar PDF
-                      window.print()
+                    onClick={async () => {
+                      if (!resultado?.id) {
+                        toast.error('Guarda el reporte antes de exportar PDF')
+                        return
+                      }
+                      try {
+                        const res = await fetch('/api/ia/reporte/pdf', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ reporteId: resultado.id, guardar: true }),
+                        })
+                        if (!res.ok) throw new Error('Error PDF')
+                        const blob = await res.blob()
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `reporte-ia-${resultado.id.slice(0, 8)}.pdf`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                        toast.success('PDF descargado')
+                      } catch {
+                        toast.error('No se pudo generar el PDF')
+                      }
                     }}
                     className="btn-secondary btn-sm"
                   >

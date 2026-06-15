@@ -52,6 +52,7 @@ export async function fetchPortalReportes(pacienteId: string) {
     .from('archivos_paciente')
     .select('*')
     .eq('paciente_id', pacienteId)
+    .eq('visible_a_padres', true)
     .order('created_at', { ascending: false })
 
   return { reportes: reportes || [], archivos: archivos || [] }

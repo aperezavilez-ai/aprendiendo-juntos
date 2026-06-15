@@ -18,6 +18,8 @@ import {
   ArrowLeftIcon,
   BeakerIcon,
   HeartIcon,
+  TrashIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline'
 import { format, differenceInYears } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -272,7 +274,7 @@ export default function ExpedientePaciente() {
           <TabPlanes planes={planes} pacienteId={paciente.id} />
         )}
         {tabActiva === 'archivos' && (
-          <TabArchivos archivos={archivos} pacienteId={paciente.id} />
+          <TabArchivos archivos={archivos} pacienteId={paciente.id} onRefresh={fetchExpediente} />
         )}
       </div>
     </div>
@@ -832,7 +834,20 @@ function TabPlanes({ planes, pacienteId }: { planes: PlanTerapeutico[], paciente
 // ============================================================
 // TAB: ARCHIVOS
 // ============================================================
-function TabArchivos({ archivos, pacienteId }: { archivos: ArchivoPaciente[], pacienteId: string }) {
+function TabArchivos({
+  archivos,
+  pacienteId,
+  onRefresh,
+}: {
+  archivos: ArchivoPaciente[]
+  pacienteId: string
+  onRefresh: () => void
+}) {
+  const [subiendo, setSubiendo] = useState(false)
+  const [tipo, setTipo] = useState('estudio')
+  const [visiblePadres, setVisiblePadres] = useState(false)
+  const fileInputId = `upload-${pacienteId}`
+
   const tipoIcon: Record<string, string> = {
     estudio: '🔬',
     receta: '💊',
@@ -842,37 +857,124 @@ function TabArchivos({ archivos, pacienteId }: { archivos: ArchivoPaciente[], pa
     otro: '📎',
   }
 
+  const subirArchivo = async (file: File) => {
+    setSubiendo(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('tipo', tipo)
+      form.append('visible_a_padres', String(visiblePadres))
+
+      const res = await fetch(`/api/pacientes/${pacienteId}/archivos`, {
+        method: 'POST',
+        body: form,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al subir')
+
+      toast.success('Archivo subido')
+      onRefresh()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error al subir archivo')
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
+  const eliminarArchivo = async (archivoId: string) => {
+    if (!confirm('¿Eliminar este archivo?')) return
+    try {
+      const res = await fetch(
+        `/api/pacientes/${pacienteId}/archivos?archivoId=${archivoId}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) throw new Error('Error al eliminar')
+      toast.success('Archivo eliminado')
+      onRefresh()
+    } catch {
+      toast.error('No se pudo eliminar el archivo')
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-sm text-neutral-500">{archivos.length} archivos</p>
-        <button className="btn-primary btn-sm">
-          <PlusIcon className="w-4 h-4" />
-          Subir archivo
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="input py-1.5 text-sm w-auto"
+            value={tipo}
+            onChange={e => setTipo(e.target.value)}
+          >
+            <option value="estudio">Estudio</option>
+            <option value="receta">Receta</option>
+            <option value="consentimiento">Consentimiento</option>
+            <option value="foto">Foto</option>
+            <option value="video">Video</option>
+            <option value="otro">Otro</option>
+          </select>
+          <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+            <input
+              type="checkbox"
+              checked={visiblePadres}
+              onChange={e => setVisiblePadres(e.target.checked)}
+              className="rounded border-neutral-300"
+            />
+            Visible en portal padres
+          </label>
+          <input
+            id={fileInputId}
+            type="file"
+            className="hidden"
+            accept="image/jpeg,image/png,image/webp,application/pdf,video/mp4"
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file) subirArchivo(file)
+              e.target.value = ''
+            }}
+          />
+          <label htmlFor={fileInputId} className={`btn-primary btn-sm ${subiendo ? 'opacity-60 pointer-events-none' : ''}`}>
+            {subiendo ? (
+              <ArrowUpTrayIcon className="w-4 h-4 animate-pulse" />
+            ) : (
+              <PlusIcon className="w-4 h-4" />
+            )}
+            {subiendo ? 'Subiendo...' : 'Subir archivo'}
+          </label>
+        </div>
       </div>
       {archivos.length === 0 ? (
         <div className="card empty-state py-12">
           <PhotoIcon className="empty-state-icon w-12 h-12" />
           <p className="empty-state-title">Sin archivos</p>
-          <p className="empty-state-desc">Sube estudios, fotografías y documentos del paciente</p>
+          <p className="empty-state-desc">Sube estudios, fotografías y documentos del paciente (máx. 10 MB)</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {archivos.map((arch) => (
-            <a
+            <div
               key={arch.id}
-              href={arch.url}
-              target="_blank"
-              rel="noreferrer"
-              className="card p-4 hover:shadow-card-hover transition-shadow text-center group"
+              className="card p-4 hover:shadow-card-hover transition-shadow text-center group relative"
             >
-              <div className="text-3xl mb-2">{tipoIcon[arch.tipo || 'otro'] || '📎'}</div>
-              <p className="text-xs font-medium text-neutral-800 truncate">{arch.nombre}</p>
-              <p className="text-2xs text-neutral-400 mt-1">
-                {format(new Date(arch.created_at), 'd MMM yyyy', { locale: es })}
-              </p>
-            </a>
+              <a href={arch.url} target="_blank" rel="noreferrer" className="block">
+                <div className="text-3xl mb-2">{tipoIcon[arch.tipo || 'otro'] || '📎'}</div>
+                <p className="text-xs font-medium text-neutral-800 truncate">{arch.nombre}</p>
+                <p className="text-2xs text-neutral-400 mt-1">
+                  {format(new Date(arch.created_at), 'd MMM yyyy', { locale: es })}
+                </p>
+                {(arch as ArchivoPaciente & { visible_a_padres?: boolean }).visible_a_padres && (
+                  <span className="badge badge-primary text-2xs mt-2 inline-block">Portal</span>
+                )}
+              </a>
+              <button
+                type="button"
+                onClick={() => eliminarArchivo(arch.id)}
+                className="absolute top-2 right-2 p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-danger-50 text-danger-600 transition-opacity"
+                title="Eliminar"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            </div>
           ))}
         </div>
       )}
