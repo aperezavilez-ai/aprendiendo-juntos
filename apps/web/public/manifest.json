@@ -1,6 +1,6 @@
 {
-  "name": "TerapiaOS",
-  "short_name": "TerapiaOS",
+  "name": "Aprendamos Juntos",
+  "short_name": "Aprendamos",
   "description": "Sistema de gestión de terapia ocupacional infantil",
   "start_url": "/dashboard",
   "display": "standalone",

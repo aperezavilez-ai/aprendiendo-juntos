@@ -111,8 +111,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-neutral-100">
         <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center shadow-sm group-hover:bg-primary-700 transition-colors">
-            <span className="text-white font-bold text-sm">T</span>
+          <div className="w-8 h-8 bg-primary-600 rounded-xl flex items-center justify-center shadow-sm group-hover:bg-primary-700 transition-colors">
+            <span className="text-white font-bold text-xs">A</span>
           </div>
           <div>
             <p className="font-semibold text-neutral-900 text-sm leading-none">Aprendamos Juntos</p>
@@ -140,7 +140,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 item.highlight && !isActive && 'text-secondary-600 hover:bg-secondary-50 hover:text-secondary-700'
               )}
             >
-              <item.icon className="w-4 h-4 shrink-0" />
+              <item.icon className="w-3.5 h-3.5 shrink-0" />
               <span>{item.label}</span>
               {item.highlight && (
                 <span className="ml-auto badge badge-primary text-2xs">IA</span>
@@ -164,7 +164,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   onClick={() => setSidebarOpen(false)}
                   className={isActive ? 'sidebar-item-active' : 'sidebar-item'}
                 >
-                  <item.icon className="w-4 h-4 shrink-0" />
+                  <item.icon className="w-3.5 h-3.5 shrink-0" />
                   <span>{item.label}</span>
                 </Link>
               )
