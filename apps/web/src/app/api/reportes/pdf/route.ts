@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 </head>
 <body>
   <div class="header">
-    <h1>${clinica?.nombre || 'TerapiaOS'}</h1>
+    <h1>${clinica?.nombre || 'Aprendamos Juntos'}</h1>
     <p>Reporte Ejecutivo de Operaciones</p>
     <div class="meta">
       Generado el ${fechaActual} · Período: últimos ${periodo} meses · ${clinica?.ciudad ? `${clinica.ciudad}, ${clinica.estado}` : ''}
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
   </div>
   
   <div class="footer">
-    <p>Reporte generado por TerapiaOS · Sistema de Gestión de Terapia Ocupacional Infantil</p>
+    <p>Reporte generado por Aprendamos Juntos · Sistema de Gestión de Terapia Ocupacional Infantil</p>
     <p style="margin-top: 4px;">Este documento es confidencial y para uso interno exclusivamente</p>
   </div>
 </body>

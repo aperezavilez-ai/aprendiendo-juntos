@@ -9,8 +9,10 @@ const inter = Inter({
   display: 'swap',
 })
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aprendamosjuntos.mx'
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://www.aprendamosjuntos.mx'),
+  metadataBase: new URL(APP_URL),
   title: {
     template: '%s | Aprendamos Juntos',
     default: 'Aprendamos Juntos — Plataforma de Terapia Ocupacional Infantil',
@@ -28,9 +30,13 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
+    url: APP_URL,
     siteName: 'Aprendamos Juntos',
     title: 'Aprendamos Juntos — Terapia Ocupacional Infantil',
     description: 'Plataforma SaaS para clínicas de terapia ocupacional infantil',
+  },
+  alternates: {
+    canonical: APP_URL,
   },
   icons: {
     shortcut: '/favicon.ico',

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'terapia-os-v1'
-const STATIC_CACHE = 'terapia-static-v1'
+const CACHE_NAME = 'aprendamos-juntos-v1'
+const STATIC_CACHE = 'aprendamos-static-v1'
 
 const STATIC_ASSETS = [
   '/',
@@ -95,7 +95,7 @@ self.addEventListener('fetch', (event) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sin conexión - TerapiaOS</title>
+  <title>Sin conexión - Aprendamos Juntos</title>
   <style>
     body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #F8FAFC; color: #1E293B; }
     .container { text-align: center; padding: 32px; }
@@ -145,7 +145,7 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.titulo || 'TerapiaOS', options)
+    self.registration.showNotification(data.titulo || 'Aprendamos Juntos', options)
   )
 })
 

@@ -361,6 +361,15 @@ export default function ConfiguracionPage() {
                   <label className="label">Access Token</label>
                   <input type="password" className="input font-mono" placeholder="EAAxxxxxxx..." value={configWA.access_token} onChange={e => setConfigWA(c => ({ ...c, access_token: e.target.value }))} />
                 </div>
+                <div>
+                  <label className="label">URL del webhook</label>
+                  <input
+                    className="input font-mono text-xs"
+                    readOnly
+                    value={`${process.env.NEXT_PUBLIC_APP_URL || 'https://www.aprendamosjuntos.mx'}/api/whatsapp/webhook`}
+                  />
+                  <p className="text-2xs text-neutral-400 mt-1">Configura esta URL en Meta Business → WhatsApp → Webhooks</p>
+                </div>
                 <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl">
                   <input type="checkbox" id="wa_activo" checked={configWA.activo} onChange={e => setConfigWA(c => ({ ...c, activo: e.target.checked }))} className="w-4 h-4 text-primary-600 rounded" />
                   <label htmlFor="wa_activo" className="text-sm text-neutral-700 cursor-pointer">
