@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,28 +11,46 @@ function getSupabase() {
   )
 }
 
-// Verificación del webhook (GET - Meta lo llama al configurar)
+function verifySignature(rawBody: string, signature: string | null): boolean {
+  const secret = process.env.WHATSAPP_APP_SECRET
+  if (!secret) {
+    console.warn('WHATSAPP_APP_SECRET no configurado — webhook sin verificación de firma')
+    return true
+  }
+  if (!signature?.startsWith('sha256=')) return false
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+  const received = signature.slice(7)
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received))
+  } catch {
+    return false
+  }
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const mode = searchParams.get('hub.mode')
   const token = searchParams.get('hub.verify_token')
   const challenge = searchParams.get('hub.challenge')
-
   const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN
 
   if (mode === 'subscribe' && token === verifyToken) {
-    console.log('WhatsApp webhook verificado')
     return new NextResponse(challenge, { status: 200 })
   }
-
   return NextResponse.json({ error: 'Verificación fallida' }, { status: 403 })
 }
 
-// Recepción de mensajes entrantes y actualizaciones de estado
 export async function POST(request: NextRequest) {
+  const rawBody = await request.text()
+  const signature = request.headers.get('x-hub-signature-256')
+
+  if (!verifySignature(rawBody, signature)) {
+    return NextResponse.json({ error: 'Firma inválida' }, { status: 403 })
+  }
+
   const supabase = getSupabase()
   try {
-    const body = await request.json()
+    const body = JSON.parse(rawBody)
 
     if (body.object !== 'whatsapp_business_account') {
       return NextResponse.json({ status: 'ignored' })
@@ -41,88 +60,77 @@ export async function POST(request: NextRequest) {
       for (const change of entry.changes || []) {
         const value = change.value
 
-        // Mensajes entrantes (respuestas de padres)
         if (value.messages) {
           for (const message of value.messages) {
             const from = message.from
             const text = message.text?.body || ''
-            const waId = message.id
 
-            // Buscar el familiar por teléfono
-            const { data: familiar } = await supabase
+            const { data: familiares } = await supabase
               .from('familiares')
-              .select('id, paciente_id, pacientes(clinica_id)')
-              .eq('telefono', from)
-              .maybeSingle()
+              .select('id, paciente_id, pacientes(clinica_id, nombre)')
+              .or(`telefono.eq.${from},telefono.eq.+${from},telefono.ilike.%${from.slice(-10)}%`)
+              .limit(1)
 
-            if (familiar) {
-              // Actualizar mensaje existente con la respuesta (si fue recordatorio)
+            const familiar = familiares?.[0]
+            if (!familiar) continue
+
+            await supabase
+              .from('mensajes_whatsapp')
+              .update({ respuesta: text, leido_at: new Date().toISOString() })
+              .ilike('telefono_destino', `%${from.slice(-10)}%`)
+              .is('leido_at', null)
+
+            if (/^(si|sí|yes|s|1)$/i.test(text.trim())) {
               await supabase
-                .from('mensajes_whatsapp')
-                .update({ respuesta: text, leido_at: new Date().toISOString() })
-                .eq('telefono_destino', from)
-                .is('leido_at', null)
-                .order('created_at', { ascending: false })
-                .limit(1)
+                .from('citas')
+                .update({ confirmada_por_padre: true, estado: 'confirmada' })
+                .eq('paciente_id', familiar.paciente_id)
+                .in('estado', ['programada', 'confirmada'])
+                .eq('confirmada_por_padre', false)
+                .gte('fecha_inicio', new Date().toISOString())
+            }
 
-              // Si responde SÍ/SI a un recordatorio, confirmar cita
-              if (/^(si|sí|yes|s|1)$/i.test(text.trim())) {
-                await supabase
-                  .from('citas')
-                  .update({ confirmada_por_padre: true, estado: 'confirmada' })
-                  .eq('paciente_id', familiar.paciente_id)
-                  .eq('confirmada_por_padre', false)
-                  .gte('fecha_inicio', new Date().toISOString())
-                  .order('fecha_inicio')
-                  .limit(1)
-              }
+            const clinicaId = (familiar as { pacientes?: { clinica_id?: string; nombre?: string } }).pacientes?.clinica_id
+            const pacienteNombre = (familiar as { pacientes?: { nombre?: string } }).pacientes?.nombre
+            if (clinicaId) {
+              const { data: staff } = await supabase
+                .from('usuarios')
+                .select('id')
+                .eq('clinica_id', clinicaId)
+                .in('rol', ['terapeuta', 'recepcion', 'admin_general', 'director_clinico'])
+                .eq('activo', true)
 
-              // Crear notificación para el terapeuta
-              const clinicaId = (familiar as any).pacientes?.clinica_id
-              if (clinicaId) {
-                const { data: terapeutas } = await supabase
-                  .from('usuarios')
-                  .select('id')
-                  .eq('clinica_id', clinicaId)
-                  .in('rol', ['terapeuta', 'recepcion'])
-
-                for (const t of terapeutas || []) {
-                  await supabase.from('notificaciones').insert({
-                    usuario_id: t.id,
+              if (staff?.length) {
+                await supabase.from('notificaciones').insert(
+                  staff.map(s => ({
+                    usuario_id: s.id,
                     clinica_id: clinicaId,
                     tipo: 'mensaje',
                     titulo: 'Respuesta de WhatsApp',
-                    mensaje: `Respuesta recibida: "${text.substring(0, 100)}"`,
+                    mensaje: `${pacienteNombre || 'Paciente'}: "${text.substring(0, 100)}"`,
                     url_accion: '/mensajes',
-                  })
-                }
+                  }))
+                )
               }
             }
           }
         }
 
-        // Actualizaciones de estado de mensajes enviados
         if (value.statuses) {
           for (const status of value.statuses) {
-            const { id: waId, status: nuevoEstado } = status
             const estadoMap: Record<string, string> = {
-              sent: 'enviado',
-              delivered: 'entregado',
-              read: 'leido',
-              failed: 'fallido',
+              sent: 'enviado', delivered: 'entregado', read: 'leido', failed: 'fallido',
             }
-
             await supabase
               .from('mensajes_whatsapp')
-              .update({ estado: estadoMap[nuevoEstado] || nuevoEstado })
-              .eq('wa_message_id', waId)
+              .update({ estado: estadoMap[status.status] || status.status })
+              .eq('wa_message_id', status.id)
           }
         }
       }
     }
 
     return NextResponse.json({ status: 'ok' })
-
   } catch (error) {
     console.error('Error en webhook WhatsApp:', error)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

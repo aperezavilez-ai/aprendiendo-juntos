@@ -44,6 +44,14 @@ export default function ConfiguracionPage() {
   const [guardando, setGuardando] = useState(false)
   const [formClinica, setFormClinica] = useState<Partial<Clinica>>({})
   const [configWA, setConfigWA] = useState({ phone_number_id: '', access_token: '', activo: false })
+  const [configNotif, setConfigNotif] = useState({
+    recordatorio_24h: true,
+    recordatorio_1h: false,
+    confirmacion_cita: false,
+    ausencia_seguimiento: false,
+    cobro_pendiente: false,
+    reporte_mensual: false,
+  })
   const [modalUsuario, setModalUsuario] = useState(false)
   const [modalSucursal, setModalSucursal] = useState(false)
   const [formUsuario, setFormUsuario] = useState({ nombre: '', apellidos: '', email: '', rol: 'terapeuta', telefono: '' })
@@ -80,6 +88,10 @@ export default function ConfiguracionPage() {
       if (clinRes.data) {
         setClinica(clinRes.data as Clinica)
         setFormClinica(clinRes.data as Clinica)
+        const cfg = (clinRes.data as Clinica & { configuracion?: { notificaciones?: typeof configNotif } }).configuracion
+        if (cfg?.notificaciones) {
+          setConfigNotif(prev => ({ ...prev, ...cfg.notificaciones }))
+        }
       }
       setSucursales((sucRes.data || []) as Sucursal[])
       setUsuarios((usrRes.data || []) as Usuario[])
@@ -129,6 +141,20 @@ export default function ConfiguracionPage() {
       if (error) throw error
       toast.success('Configuración de WhatsApp guardada')
     } catch { toast.error('Error al guardar WhatsApp') } finally { setGuardando(false) }
+  }
+
+  const guardarNotificaciones = async () => {
+    if (!clinica) return
+    setGuardando(true)
+    try {
+      const actual = (clinica as Clinica & { configuracion?: Record<string, unknown> }).configuracion || {}
+      const { error } = await supabase.from('clinicas').update({
+        configuracion: { ...actual, notificaciones: configNotif },
+      }).eq('id', clinica.id)
+      if (error) throw error
+      toast.success('Preferencias de notificaciones guardadas')
+      fetchData()
+    } catch { toast.error('Error al guardar') } finally { setGuardando(false) }
   }
 
   const invitarUsuario = async () => {
@@ -422,15 +448,20 @@ export default function ConfiguracionPage() {
                       <p className="text-xs text-neutral-500 mt-0.5">{notif.desc}</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                      <input type="checkbox" className="sr-only peer" defaultChecked={notif.id.includes('recordatorio')} />
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={configNotif[notif.id as keyof typeof configNotif] ?? false}
+                        onChange={e => setConfigNotif(c => ({ ...c, [notif.id]: e.target.checked }))}
+                      />
                       <div className="w-10 h-6 bg-neutral-200 peer-focus:ring-2 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                     </label>
                   </div>
                 ))}
               </div>
               <div className="flex justify-end pt-2 border-t border-neutral-100">
-                <button onClick={() => toast.success('Configuración guardada')} className="btn-primary">
-                  Guardar cambios
+                <button onClick={guardarNotificaciones} disabled={guardando} className="btn-primary">
+                  {guardando ? 'Guardando...' : 'Guardar cambios'}
                 </button>
               </div>
             </div>
@@ -446,28 +477,21 @@ export default function ConfiguracionPage() {
                 <div className="bg-success-50 border border-success-200 rounded-xl p-4 flex items-start gap-3">
                   <CheckCircleIcon className="w-5 h-5 text-success-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-success-800">Plataforma segura</p>
+                    <p className="text-sm font-medium text-success-800">Seguridad activa</p>
                     <p className="text-xs text-success-700 mt-0.5">
-                      Todos los datos están cifrados con AES-256. Conexiones mediante TLS 1.3.
-                      Cumplimiento con NOM-024-SSA3-2010 (México).
+                      Autenticación Supabase, RLS por clínica, TLS en tránsito y acceso por roles (admin, terapeuta, recepción, padre).
                     </p>
                   </div>
                 </div>
                 {[
-                  { label: 'Autenticación de dos factores (2FA)', desc: 'Agrega una capa extra de seguridad a tu cuenta' },
-                  { label: 'Registro de auditoría', desc: 'Mantén un historial de todas las acciones realizadas' },
-                  { label: 'Sesiones simultáneas', desc: 'Permite que el mismo usuario tenga múltiples sesiones activas' },
-                  { label: 'Expiración automática de sesión', desc: 'Cierra la sesión automáticamente después de 8 horas inactivo' },
-                ].map(config => (
-                  <div key={config.label} className="flex items-center justify-between gap-4 p-3 bg-neutral-50 rounded-xl">
-                    <div>
-                      <p className="text-sm font-medium text-neutral-900">{config.label}</p>
-                      <p className="text-xs text-neutral-500 mt-0.5">{config.desc}</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                      <input type="checkbox" className="sr-only peer" defaultChecked />
-                      <div className="w-10 h-6 bg-neutral-200 peer-focus:ring-2 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
+                  { label: 'Row Level Security (RLS)', desc: 'Cada clínica solo ve sus datos. Padres solo ven a su hijo.' },
+                  { label: 'Roles de usuario', desc: 'Admin, director, terapeuta, recepción y padre con permisos diferenciados.' },
+                  { label: 'API protegidas', desc: 'Cron, IA, archivos y staff requieren autenticación o secretos.' },
+                  { label: 'Webhook WhatsApp', desc: 'Verificación de firma HMAC cuando WHATSAPP_APP_SECRET está configurado.' },
+                ].map(item => (
+                  <div key={item.label} className="p-3 bg-neutral-50 rounded-xl">
+                    <p className="text-sm font-medium text-neutral-900">{item.label}</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">{item.desc}</p>
                   </div>
                 ))}
               </div>

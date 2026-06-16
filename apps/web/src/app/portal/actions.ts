@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getPortalSession } from '@/lib/portal-auth'
 import { confirmarPortalCita, enviarPortalMensaje } from '@/lib/portal-data'
+import { notificarUsuarios } from '@/lib/notificaciones'
 
 export async function confirmarCitaAction(citaId: string) {
   const ctx = await getPortalSession()
@@ -32,6 +33,16 @@ export async function enviarMensajeAction(contenido: string) {
       ctx.user.id,
       contenido
     )
+
+    const pacienteData = ctx.familiar.paciente as { nombre?: string; apellidos?: string }
+    await notificarUsuarios(paciente.clinica_id, {
+      roles: ['terapeuta', 'recepcion', 'admin_general', 'director_clinico'],
+      tipo: 'mensaje',
+      titulo: 'Nuevo mensaje del portal',
+      mensaje: `${pacienteData?.nombre || 'Padre'}: ${contenido.trim().substring(0, 120)}`,
+      url_accion: '/mensajes',
+    })
+
     revalidatePath('/portal/mensajes')
     return { mensaje }
   } catch (e) {

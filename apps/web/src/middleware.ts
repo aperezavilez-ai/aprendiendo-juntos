@@ -8,6 +8,9 @@ async function getUserRol(supabase: ReturnType<typeof createServerClient>, userI
   return data?.rol as string | undefined
 }
 
+const STAFF_ADMIN_ROUTES = ['/configuracion']
+const STAFF_FACTURACION_ROUTES = ['/facturacion']
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -65,6 +68,22 @@ export async function middleware(request: NextRequest) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
+    }
+
+    if (!esPadre && rol) {
+      const esAdmin = ['admin_general', 'director_clinico'].includes(rol)
+      const puedeFacturar = esAdmin || rol === 'recepcion'
+
+      if (STAFF_ADMIN_ROUTES.some(r => pathname.startsWith(r)) && !esAdmin) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+      }
+      if (STAFF_FACTURACION_ROUTES.some(r => pathname.startsWith(r)) && !puedeFacturar) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+      }
     }
   }
 

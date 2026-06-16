@@ -40,23 +40,38 @@ const COLORS_ESTADO: Record<string, string> = {
 interface EventoCita extends Event {
   id: string
   paciente_id: string
+  terapeuta_id: string
   estado: string
   tipo: string
   pacienteNombre: string
   terapeuta: string
   duracion: number
+  sala?: string
+  notas_cita?: string
+  costo?: number | null
 }
 
 interface ModalNuevaCitaProps {
   open: boolean
   fechaInicio: Date | null
+  citaId?: string | null
   onClose: () => void
-  onSave: (cita: any) => void
+  onSave: (cita: any, citaId?: string | null) => void
   pacientes: Paciente[]
   terapeutas: Usuario[]
+  initialData?: {
+    paciente_id: string
+    terapeuta_id: string
+    fecha_inicio: string
+    duracion: number
+    tipo: string
+    sala: string
+    notas_cita: string
+    costo: string
+  } | null
 }
 
-function ModalNuevaCita({ open, fechaInicio, onClose, onSave, pacientes, terapeutas }: ModalNuevaCitaProps) {
+function ModalNuevaCita({ open, fechaInicio, citaId, onClose, onSave, pacientes, terapeutas, initialData }: ModalNuevaCitaProps) {
   const [form, setForm] = useState({
     paciente_id: '',
     terapeuta_id: '',
@@ -69,10 +84,21 @@ function ModalNuevaCita({ open, fechaInicio, onClose, onSave, pacientes, terapeu
   })
 
   useEffect(() => {
-    if (fechaInicio) {
+    if (initialData) {
+      setForm({
+        paciente_id: initialData.paciente_id,
+        terapeuta_id: initialData.terapeuta_id,
+        fecha_inicio: initialData.fecha_inicio,
+        duracion: initialData.duracion,
+        tipo: initialData.tipo,
+        sala: initialData.sala,
+        notas_cita: initialData.notas_cita,
+        costo: initialData.costo,
+      })
+    } else if (fechaInicio) {
       setForm(f => ({ ...f, fecha_inicio: format(fechaInicio, "yyyy-MM-dd'T'HH:mm") }))
     }
-  }, [fechaInicio])
+  }, [fechaInicio, initialData, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,7 +114,7 @@ function ModalNuevaCita({ open, fechaInicio, onClose, onSave, pacientes, terapeu
       fecha_fin: fin.toISOString(),
       duracion_minutos: form.duracion,
       costo: form.costo ? parseFloat(form.costo) : null,
-    })
+    }, citaId)
   }
 
   if (!open) return null
@@ -98,7 +124,7 @@ function ModalNuevaCita({ open, fechaInicio, onClose, onSave, pacientes, terapeu
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-modal w-full max-w-lg animate-slide-in-up">
         <div className="flex items-center justify-between p-5 border-b border-neutral-100">
-          <h2 className="text-base font-semibold text-neutral-900">Nueva cita</h2>
+          <h2 className="text-base font-semibold text-neutral-900">{citaId ? 'Editar cita' : 'Nueva cita'}</h2>
           <button onClick={onClose} className="btn-icon text-neutral-400">
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -212,7 +238,7 @@ function ModalNuevaCita({ open, fechaInicio, onClose, onSave, pacientes, terapeu
               Cancelar
             </button>
             <button type="submit" className="btn-primary flex-1">
-              Agendar cita
+              {citaId ? 'Guardar cambios' : 'Agendar cita'}
             </button>
           </div>
         </form>
@@ -226,6 +252,7 @@ export default function AgendaPage() {
   const [vistaActual, setVistaActual] = useState<View>('week')
   const [fechaActual, setFechaActual] = useState(new Date())
   const [modalAbierto, setModalAbierto] = useState(false)
+  const [citaEditando, setCitaEditando] = useState<EventoCita | null>(null)
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null)
   const [eventoSeleccionado, setEventoSeleccionado] = useState<EventoCita | null>(null)
   const [pacientes, setPacientes] = useState<Paciente[]>([])
@@ -275,7 +302,7 @@ export default function AgendaPage() {
     const { data } = await supabase
       .from('citas')
       .select(`
-        id, paciente_id, fecha_inicio, fecha_fin, estado, tipo, notas_cita, duracion_minutos,
+        id, paciente_id, terapeuta_id, fecha_inicio, fecha_fin, estado, tipo, notas_cita, duracion_minutos, sala, costo,
         paciente:pacientes(nombre, apellidos),
         terapeuta:usuarios(nombre, apellidos)
       `)
@@ -289,6 +316,7 @@ export default function AgendaPage() {
         data.map((c: any) => ({
           id: c.id,
           paciente_id: c.paciente_id,
+          terapeuta_id: c.terapeuta_id,
           title: `${c.paciente?.nombre} ${c.paciente?.apellidos}`,
           start: new Date(c.fecha_inicio),
           end: new Date(c.fecha_fin),
@@ -297,6 +325,9 @@ export default function AgendaPage() {
           pacienteNombre: `${c.paciente?.nombre} ${c.paciente?.apellidos}`,
           terapeuta: `${c.terapeuta?.nombre} ${c.terapeuta?.apellidos || ''}`,
           duracion: c.duracion_minutos,
+          sala: c.sala,
+          notas_cita: c.notas_cita,
+          costo: c.costo,
         }))
       )
     }
@@ -307,7 +338,7 @@ export default function AgendaPage() {
     setModalAbierto(true)
   }
 
-  const handleGuardarCita = async (formData: any) => {
+  const handleGuardarCita = async (formData: any, citaId?: string | null) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
@@ -319,21 +350,54 @@ export default function AgendaPage() {
         .single()
       if (!usuario) return
 
-      const { error } = await supabase.from('citas').insert({
-        ...formData,
-        clinica_id: usuario.clinica_id,
-        sucursal_id: usuario.sucursal_id,
-        estado: 'programada',
-      })
+      if (citaId) {
+        const { error } = await supabase.from('citas').update({
+          paciente_id: formData.paciente_id,
+          terapeuta_id: formData.terapeuta_id,
+          fecha_inicio: formData.fecha_inicio,
+          fecha_fin: formData.fecha_fin,
+          duracion_minutos: formData.duracion_minutos,
+          tipo: formData.tipo,
+          sala: formData.sala,
+          notas_cita: formData.notas_cita,
+          costo: formData.costo,
+        }).eq('id', citaId)
+        if (error) throw error
+        toast.success('Cita actualizada')
+      } else {
+        const { error } = await supabase.from('citas').insert({
+          ...formData,
+          clinica_id: usuario.clinica_id,
+          sucursal_id: usuario.sucursal_id,
+          estado: 'programada',
+        })
+        if (error) throw error
+        toast.success('Cita agendada exitosamente')
+      }
 
-      if (error) throw error
-
-      toast.success('Cita agendada exitosamente')
       setModalAbierto(false)
+      setCitaEditando(null)
       await fetchCitas(usuario.clinica_id)
     } catch (err) {
-      toast.error('Error al agendar la cita')
+      toast.error(citaId ? 'Error al actualizar' : 'Error al agendar la cita')
       console.error(err)
+    }
+  }
+
+  const actualizarEstadoCita = async (citaId: string, estado: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data: usuario } = await supabase.from('usuarios').select('clinica_id').eq('id', session.user.id).single()
+      if (!usuario) return
+
+      const { error } = await supabase.from('citas').update({ estado }).eq('id', citaId)
+      if (error) throw error
+      toast.success('Estado actualizado')
+      setEventoSeleccionado(null)
+      await fetchCitas(usuario.clinica_id)
+    } catch {
+      toast.error('Error al actualizar')
     }
   }
 
@@ -479,8 +543,19 @@ export default function AgendaPage() {
       {/* Modal nueva cita */}
       <ModalNuevaCita
         open={modalAbierto}
+        citaId={citaEditando?.id || null}
         fechaInicio={fechaSeleccionada}
-        onClose={() => setModalAbierto(false)}
+        initialData={citaEditando ? {
+          paciente_id: citaEditando.paciente_id,
+          terapeuta_id: citaEditando.terapeuta_id,
+          fecha_inicio: format(citaEditando.start as Date, "yyyy-MM-dd'T'HH:mm"),
+          duracion: citaEditando.duracion || 60,
+          tipo: citaEditando.tipo,
+          sala: citaEditando.sala || '',
+          notas_cita: citaEditando.notas_cita || '',
+          costo: citaEditando.costo != null ? String(citaEditando.costo) : '',
+        } : null}
+        onClose={() => { setModalAbierto(false); setCitaEditando(null) }}
         onSave={handleGuardarCita}
         pacientes={pacientes}
         terapeutas={terapeutas}
@@ -516,21 +591,44 @@ export default function AgendaPage() {
                 <UserIcon className="w-4 h-4 text-neutral-400" />
                 {eventoSeleccionado.terapeuta}
               </div>
-              <div className="pt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => cancelarCita(eventoSeleccionado.id)}
-                  className="btn-secondary flex-1 btn-sm"
-                >
-                  Cancelar cita
-                </button>
-                <button
-                  type="button"
-                  onClick={() => registrarSesion(eventoSeleccionado)}
-                  className="btn-primary flex-1 btn-sm"
-                >
-                  Registrar sesión
-                </button>
+              <div className="pt-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {eventoSeleccionado.estado === 'programada' && (
+                    <button type="button" onClick={() => actualizarEstadoCita(eventoSeleccionado.id, 'confirmada')} className="btn-secondary btn-sm">
+                      Confirmar
+                    </button>
+                  )}
+                  {!['completada', 'cancelada'].includes(eventoSeleccionado.estado) && (
+                    <button type="button" onClick={() => actualizarEstadoCita(eventoSeleccionado.id, 'completada')} className="btn-primary btn-sm">
+                      Completada
+                    </button>
+                  )}
+                  {!['completada', 'cancelada', 'no_asistio'].includes(eventoSeleccionado.estado) && (
+                    <button type="button" onClick={() => actualizarEstadoCita(eventoSeleccionado.id, 'no_asistio')} className="btn-secondary btn-sm text-danger-600">
+                      No asistió
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCitaEditando(eventoSeleccionado)
+                      setFechaSeleccionada(eventoSeleccionado.start as Date)
+                      setModalAbierto(true)
+                      setEventoSeleccionado(null)
+                    }}
+                    className="btn-secondary btn-sm"
+                  >
+                    Editar
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => cancelarCita(eventoSeleccionado.id)} className="btn-secondary flex-1 btn-sm">
+                    Cancelar cita
+                  </button>
+                  <button type="button" onClick={() => registrarSesion(eventoSeleccionado)} className="btn-primary flex-1 btn-sm">
+                    Registrar sesión
+                  </button>
+                </div>
               </div>
             </div>
           </div>

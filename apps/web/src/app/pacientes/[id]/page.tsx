@@ -48,6 +48,7 @@ export default function ExpedientePaciente() {
   const [citas, setCitas] = useState<Cita[]>([])
   const [evaluaciones, setEvaluaciones] = useState<Evaluacion[]>([])
   const [planes, setPlanes] = useState<PlanTerapeutico[]>([])
+  const [sesiones, setSesiones] = useState<any[]>([])
   const [archivos, setArchivos] = useState<ArchivoPaciente[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
@@ -107,6 +108,15 @@ export default function ExpedientePaciente() {
         .order('fecha_inicio', { ascending: false })
 
       setPlanes((planesData || []) as unknown as PlanTerapeutico[])
+
+      const { data: sesionesData } = await supabase
+        .from('sesiones')
+        .select(`*, terapeuta:usuarios(nombre, apellidos)`)
+        .eq('paciente_id', pacienteId)
+        .order('fecha', { ascending: false })
+        .limit(20)
+
+      setSesiones(sesionesData || [])
 
       // Archivos
       const { data: archivosData } = await supabase
@@ -272,6 +282,9 @@ export default function ExpedientePaciente() {
         )}
         {tabActiva === 'planes' && (
           <TabPlanes planes={planes} pacienteId={paciente.id} />
+        )}
+        {tabActiva === 'sesiones' && (
+          <TabSesiones sesiones={sesiones} pacienteId={paciente.id} />
         )}
         {tabActiva === 'archivos' && (
           <TabArchivos archivos={archivos} pacienteId={paciente.id} onRefresh={fetchExpediente} />
@@ -826,6 +839,57 @@ function TabPlanes({ planes, pacienteId }: { planes: PlanTerapeutico[], paciente
             </div>
           )
         })
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// TAB: SESIONES
+// ============================================================
+function TabSesiones({ sesiones, pacienteId }: { sesiones: any[]; pacienteId: string }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-neutral-500">{sesiones.length} sesiones registradas</p>
+        <Link href={`/sesiones/nueva?paciente=${pacienteId}`} className="btn-primary btn-sm">
+          <PlusIcon className="w-4 h-4" />
+          Nueva sesión
+        </Link>
+      </div>
+      {sesiones.length === 0 ? (
+        <div className="card empty-state py-12">
+          <ChartBarIcon className="empty-state-icon w-12 h-12" />
+          <p className="empty-state-title">Sin sesiones</p>
+          <p className="empty-state-desc">Registra la primera sesión terapéutica del paciente</p>
+        </div>
+      ) : (
+        <div className="card divide-y divide-neutral-100">
+          {sesiones.map((s) => (
+            <div key={s.id} className="px-5 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-neutral-900">
+                    {format(new Date(s.fecha), "d MMM yyyy · HH:mm", { locale: es })}
+                  </p>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    {s.terapeuta?.nombre} {s.terapeuta?.apellidos || ''}
+                    {s.duracion_minutos ? ` · ${s.duracion_minutos} min` : ''}
+                  </p>
+                </div>
+                {s.nivel_cooperacion && (
+                  <span className="badge badge-primary text-2xs">Coop. {s.nivel_cooperacion}/5</span>
+                )}
+              </div>
+              {s.actividades && (
+                <p className="text-xs text-neutral-600 mt-2 line-clamp-2">{s.actividades}</p>
+              )}
+              {s.avances && (
+                <p className="text-xs text-success-700 mt-1">✓ {s.avances}</p>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
