@@ -35,6 +35,8 @@ const ROLES_LABEL: Record<string, string> = {
   terapeuta: 'Terapeuta',
 }
 
+const ROLES_EN_LISTA = ['director_clinico', 'terapeuta', 'recepcion'] as const
+
 export default function ConfiguracionPage() {
   const [tabActiva, setTabActiva] = useState<TabConfig>('clinica')
   const [clinica, setClinica] = useState<Clinica | null>(null)
@@ -240,6 +242,7 @@ export default function ConfiguracionPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al quitar acceso')
       toast.success('Acceso eliminado')
+      setUsuarios(prev => prev.filter(u => u.id !== usr.id))
       fetchData()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Error al quitar acceso')
@@ -296,7 +299,9 @@ export default function ConfiguracionPage() {
     } catch { toast.error('Error al crear sucursal') }
   }
 
-  const usuariosVisibles = usuarios.filter(u => u.rol !== 'admin_general')
+  const usuariosVisibles = usuarios.filter(
+    u => ROLES_EN_LISTA.includes(u.rol as (typeof ROLES_EN_LISTA)[number]) && u.activo
+  )
 
   if (loading) return (
     <div className="space-y-6">

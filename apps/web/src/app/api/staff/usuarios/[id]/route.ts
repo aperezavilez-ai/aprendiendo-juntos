@@ -180,6 +180,13 @@ export async function DELETE(
       return NextResponse.json({ error: updateError.message }, { status: 400 })
     }
 
+    if (target!.rol === 'padre') {
+      await admin
+        .from('familiares')
+        .update({ auth_user_id: null, tiene_acceso_portal: false })
+        .eq('auth_user_id', params.id)
+    }
+
     await admin.auth.admin.updateUserById(params.id, { ban_duration: '876000h' })
 
     return NextResponse.json({ ok: true })
