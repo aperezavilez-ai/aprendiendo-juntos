@@ -170,13 +170,13 @@ export default function ConfiguracionPage() {
         body: JSON.stringify(formUsuario),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al invitar')
+      if (!res.ok) throw new Error(data.error || 'Error al agregar usuario')
       toast.success(`Usuario creado. Email: ${data.email} · Contraseña: ${data.password}`, { duration: 8000 })
       setModalUsuario(false)
       setFormUsuario({ nombre: '', apellidos: '', email: '', rol: 'terapeuta', telefono: '' })
       fetchData()
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error al invitar')
+      toast.error(err instanceof Error ? err.message : 'Error al agregar usuario')
     } finally {
       setGuardando(false)
     }
@@ -348,7 +348,7 @@ export default function ConfiguracionPage() {
               <div className="flex justify-between items-center">
                 <p className="text-sm text-neutral-500">{usuarios.length} usuarios</p>
                 <button onClick={() => setModalUsuario(true)} className="btn-primary btn-sm">
-                  <PlusIcon className="w-4 h-4" /> Invitar usuario
+                  <PlusIcon className="w-4 h-4" /> Agregar usuario
                 </button>
               </div>
               <div className="card overflow-hidden">
@@ -500,13 +500,13 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
-      {/* Modal: Invitar usuario */}
+      {/* Modal: Agregar usuario */}
       {modalUsuario && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalUsuario(false)} />
           <div className="relative bg-white rounded-2xl shadow-modal w-full max-w-md animate-slide-in-up">
             <div className="flex items-center justify-between p-5 border-b border-neutral-100">
-              <h2 className="text-base font-semibold text-neutral-900">Invitar usuario</h2>
+              <h2 className="text-base font-semibold text-neutral-900">Agregar usuario</h2>
               <button onClick={() => setModalUsuario(false)} className="btn-icon text-neutral-400"><XMarkIcon className="w-5 h-5" /></button>
             </div>
             <div className="p-5 space-y-4">
@@ -537,7 +537,7 @@ export default function ConfiguracionPage() {
             </div>
             <div className="flex gap-3 p-5 border-t border-neutral-100">
               <button onClick={() => setModalUsuario(false)} className="btn-secondary flex-1">Cancelar</button>
-              <button onClick={invitarUsuario} className="btn-primary flex-1">Enviar invitación</button>
+              <button onClick={invitarUsuario} className="btn-primary flex-1">Agregar usuario</button>
             </div>
           </div>
         </div>
